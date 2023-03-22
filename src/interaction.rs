@@ -1,213 +1,153 @@
+use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
+
+use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
 
 use crate::command::{init_commands, CommandInput};
+use crate::component::{init_components, ComponentInput};
 use crate::error::{Error, InteractionError};
-use crate::embed::Embed;
-
-#[derive(Deserialize_repr, Serialize)]
-#[repr(u8)]
-enum InteractionType {
-    Ping = 1,
-    ApplicationCommand = 2,
-    MessageComponent = 3,
-    ApplicationCommandAutoComplete = 4,
-    ModalSubmit = 5
-}
-
-#[allow(dead_code)]
-#[derive(Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
-pub(crate) enum InteractionResponseType {
-    Pong = 1,
-    // Acknowledge = 2,
-    // ChannelMessage = 3,
-    ChannelMessageWithSource = 4,
-    ACKWithSource = 5,
-    AutoCompleteResult = 8
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-pub(crate) struct ApplicationCommandInteractionDataOption {
-    pub(crate) name: String,
-    #[serde(rename = "type")]
-    pub(crate) ty: ApplicationCommandOptionType,
-    pub(crate) value: Option<String>,
-    pub(crate) focused: Option<bool>
-}
+use twilight_model::http::interaction::{InteractionResponse, InteractionResponseType};
 
 #[derive(Deserialize, Serialize)]
-pub(crate) struct ApplicationCommandInteractionData {
-    pub(crate) name: String,
-    pub(crate) options: Option<Vec<ApplicationCommandInteractionDataOption>>
+pub(crate) struct Context {
+    pub(crate) interaction: Interaction,
 }
 
-#[derive(Serialize)]
-pub(crate) struct InteractionApplicationCommandCallbackData {
-    // https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-response-object-interaction-callback-data-structure
-    pub(crate) content: Option<String>,
-    pub(crate) choices: Option<Vec<ApplicationCommandOptionChoice>>,
-    pub(crate) embeds: Option<Vec<Embed>>
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct User {
-    id: String,
-    username: String,
-    discriminator: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct Member {
-    user: Option<User>,
-    nick: Option<String>,
-    permissions: Option<String>
-}
-
-impl Member {
-    pub fn is_admin(&self) -> bool {
-        match &self.permissions {
-            Some(permissions) => {
-                let num = permissions.parse::<u64>().unwrap_or(0);
-                num & 8 == 8
-            },
-            None => false
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-pub(crate) struct Interaction {
-    #[serde(rename = "type")]
-    ty: InteractionType,
-    data: Option<ApplicationCommandInteractionData>,
-    token: String,
-    guild_id: Option<String>,
-    channel_id: Option<String>,
-    user: Option<User>,
-    member: Option<Member>,
-}
-
-#[derive(Serialize_repr, Deserialize_repr, Clone)]
-#[repr(u8)]
-pub(crate) enum ApplicationCommandOptionType {
-    // https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-type
-    SubCommand = 1,
-    SubCommandGroup = 2,
-    String = 3,
-
-}
-#[derive(Deserialize, Serialize, Clone)]
-pub(crate) struct ApplicationCommandOption {
-    // https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-structure
-    pub(crate) name: String,
-    pub(crate) description: String,
-    #[serde(rename = "type")]
-    pub(crate) ty: ApplicationCommandOptionType,
-    pub(crate) choices: Option<Vec<ApplicationCommandOptionChoice>>,
-    pub(crate) autocomplete: Option<bool>,
-    pub(crate) required: Option<bool>
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub(crate) struct ApplicationCommandOptionChoice {
-    // https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-option-choice-structure
-    pub(crate) name: String,
-    pub(crate) value: String
-
-}
-
-impl Interaction {
-    fn data(&self) -> Result<&ApplicationCommandInteractionData, Error> {
-        self
-            .data
-            .as_ref()
-            .ok_or_else(|| Error::InvalidPayload("data not found".to_string()))
-    }
-}
-
-#[derive(Serialize)]
-pub struct InteractionResponse {
-    #[serde(rename = "type")]
-    pub(crate) ty: InteractionResponseType,
-    pub(crate) data: Option<InteractionApplicationCommandCallbackData>,
-}
-
-impl Interaction {
-
-
+impl Context {
     pub(crate) fn handle_ping(&self) -> InteractionResponse {
         InteractionResponse {
-            ty: InteractionResponseType::Pong,
+            kind: twilight_model::http::interaction::InteractionResponseType::Pong,
             data: None,
         }
     }
 
+    pub(crate) async fn handle_command(
+        &self,
+        ctx: &mut worker::RouteContext<()>,
+    ) -> Result<InteractionResponse, InteractionError> {
+        if let Some(InteractionData::ApplicationCommand(data)) = self.interaction.data.clone() {
+            let commands = init_commands();
 
-    pub(crate) async fn handle_command(&self, ctx: &mut worker::RouteContext<()>) -> Result<InteractionResponse, InteractionError> {
+            let command_input = CommandInput {
+                id: data.id,
+                name: data.name.clone(),
+                resolved: data.resolved,
+                kind: data.kind,
+                target_id: data.target_id,
+                options: data.options,
+                guild_id: self.interaction.guild_id,
+                channel_id: self.interaction.channel_id,
+                user: self.interaction.user.as_ref(),
+                member: self.interaction.member.as_ref(),
+                ctx: ctx,
+            };
 
-        let data = self.data().map_err(|_| InteractionError::GenericError())?;
-        let commands = init_commands();
-
-        let command_input = CommandInput {
-            options: data.options.clone(),
-            guild_id: self.guild_id.clone(),
-            channel_id: self.channel_id.clone(),
-            user: self.user.clone(),
-            member: self.member.clone(),
-            ctx: ctx
-        };
-
-        for boxed in commands.iter() {
-            let com = boxed;
-            if com.name() == data.name {
-                let response = com.respond(&command_input).await?;
-
-                return Ok(InteractionResponse {
-                    ty: InteractionResponseType::ChannelMessageWithSource,
-                    data: Some(response),
-                })
-
+            for boxed in commands.iter() {
+                let com = boxed;
+                if com.name() == data.name {
+                    let data = com.respond(&command_input).await?;
+                    return Ok(InteractionResponse {
+                        data: Some(data),
+                        kind: InteractionResponseType::ChannelMessageWithSource,
+                    });
+                }
             }
+            Err(InteractionError::UnknownCommand(data.name))
+        } else {
+            unreachable!()
         }
-        Err(InteractionError::UnknownCommand(data.name.clone()))
-    
     }
 
-    pub(crate) async fn handle_autocomplete(&self, ctx: &mut worker::RouteContext<()>) -> Result<InteractionResponse, InteractionError> {
-        let data = self.data().map_err(|_| InteractionError::GenericError())?;
-        let commands = init_commands();
+    pub(crate) async fn handle_autocomplete(
+        &self,
+        ctx: &mut worker::RouteContext<()>,
+    ) -> Result<InteractionResponse, InteractionError> {
+        if let Some(InteractionData::ApplicationCommand(data)) = self.interaction.data.clone() {
+            let commands = init_commands();
 
-        let command_input = CommandInput {
-            options: data.options.clone(),
-            guild_id: self.guild_id.clone(),
-            channel_id: self.channel_id.clone(),
-            user: self.user.clone(),
-            member: self.member.clone(),
-            ctx: ctx
-        };
+            let command_input = CommandInput {
+                id: data.id,
+                name: data.name.clone(),
+                resolved: data.resolved,
+                kind: data.kind,
+                target_id: data.target_id,
+                options: data.options,
+                guild_id: self.interaction.guild_id,
+                channel_id: self.interaction.channel_id,
+                user: self.interaction.user.as_ref(),
+                member: self.interaction.member.as_ref(),
+                ctx: ctx,
+            };
 
-        for boxed in commands.iter() {
-            let com = boxed;
-            if com.name() == data.name {
-                let response = com.autocomplete(&command_input).await?;
-
-                return Ok(InteractionResponse {
-                    ty: InteractionResponseType::AutoCompleteResult,
-                    data: response,
-                })
-
+            for boxed in commands.iter() {
+                let com = boxed;
+                if com.name() == data.name {
+                    let data = com.autocomplete(&command_input).await?;
+                    return Ok(InteractionResponse {
+                        data,
+                        kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
+                    });
+                }
             }
+            Err(InteractionError::UnknownCommand(data.name))
+        } else {
+            unreachable!()
         }
-        Err(InteractionError::UnknownCommand(data.name.clone()))
     }
 
-    pub(crate) async fn perform(&self, ctx: &mut worker::RouteContext<()>) -> Result<InteractionResponse, Error> {
-        match self.ty {
+    pub(crate) async fn handle_message_component(
+        &self,
+        ctx: &mut worker::RouteContext<()>,
+    ) -> Result<InteractionResponse, InteractionError> {
+        if let Some(InteractionData::MessageComponent(data)) = self.interaction.data.clone() {
+            let components = init_components();
+
+            let component_input = ComponentInput {
+                custom_id: data.custom_id.clone(),
+                component_type: data.component_type,
+                values: data.values,
+                guild_id: self.interaction.guild_id,
+                channel_id: self.interaction.channel_id,
+                user: self.interaction.member.as_ref(),
+                member: self.interaction.member.as_ref(),
+                message: self.interaction.message.as_ref(),
+                ctx: ctx,
+            };
+            for boxed in components.iter() {
+                let com = boxed;
+                if data.custom_id.starts_with(&com.custom_id()) {
+                    return com.respond(&component_input).await;
+                }
+            }
+            Err(InteractionError::UnknownCommand(data.custom_id))
+        } else {
+            unreachable!();
+        }
+    }
+
+    pub(crate) async fn perform(
+        &self,
+        ctx: &mut worker::RouteContext<()>,
+    ) -> Result<InteractionResponse, Error> {
+        match self.interaction.kind {
             InteractionType::Ping => Ok(self.handle_ping()),
-            InteractionType::ApplicationCommand => self.handle_command(ctx).await.map_err(Error::InteractionFailed),
-            InteractionType::ApplicationCommandAutoComplete => self.handle_autocomplete(ctx).await.map_err(Error::InteractionFailed),
-            _ => Err(Error::InvalidPayload("Not implemented".into()))
+            InteractionType::ApplicationCommand => self
+                .handle_command(ctx)
+                .await
+                .map_err(Error::InteractionFailed),
+            InteractionType::MessageComponent => self
+                .handle_message_component(ctx)
+                .await
+                .map_err(Error::InteractionFailed),
+            InteractionType::ApplicationCommandAutocomplete => self
+                .handle_autocomplete(ctx)
+                .await
+                .map_err(Error::InteractionFailed),
+            _ => Err(Error::InvalidPayload("Not implemented".into())),
         }
+    }
+
+    pub(crate) fn new(interaction: Interaction) -> Self {
+        Self { interaction }
     }
 }

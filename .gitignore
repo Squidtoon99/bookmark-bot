@@ -25,3 +25,6 @@ target/
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+# Cloudflare Workers Keys
+.dev.vars

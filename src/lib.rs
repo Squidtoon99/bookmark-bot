@@ -6,8 +6,11 @@ mod interaction;
 mod error;
 mod bot;
 mod http;
+mod input;
 mod command;
 mod commands;
+mod component;
+mod components;
 mod embed;
 
 fn log_request(req: &Request) {
@@ -46,7 +49,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                     Response::from_json(&result) 
                 },
                 Err(httperr) => {
-                    worker::console_log!("Error response : {}", httperr.to_string());
+                    worker::console_log!("Error response : {:?}", httperr);
+                    
                     Response::error(httperr.to_string(), httperr.status as u16)
                 }
             }
@@ -58,7 +62,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             let mut to_register: Vec<command::RegisteredCommand> = Vec::new();
             for boxed in commands.iter() {
                 let com = boxed;
-                let reg = command::RegisteredCommand{name: com.name(), description: com.description(), options: com.options()};
+                let reg = command::RegisteredCommand{name: com.name(), description: com.description(), options: com.options(), kind: com.kind()};
                 to_register.push(reg);
             }
 

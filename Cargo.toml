@@ -12,7 +12,7 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 cfg-if = "0.1.2"
-worker = "0.0.11"
+worker = "0.0.14"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.67"
 serde_repr = "0.1"
@@ -21,7 +21,11 @@ ed25519-dalek = "1.0.1"
 hex = "0.4.2"
 reqwest = "0.11.11"
 async-trait = "0.1.57"
-
+twilight-model = "0.15.1"
+twilight-util = {version  = "0.15.1", features = ["builder"]}
+twilight-validate = "0.15.1"
+regex = "1.7.2"
+# lazy_static = "1.4.0"
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for

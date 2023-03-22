@@ -10,4 +10,3 @@ cfg_if! {
         pub fn set_panic_hook() {}
     }
 }
-

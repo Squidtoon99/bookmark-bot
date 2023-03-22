@@ -1,3 +1,5 @@
+// use twilight_http::response::DeserializeBodyError;
+
 use crate::verification::VerificationError;
 
 #[derive(Debug, thiserror::Error)]
@@ -35,7 +37,19 @@ pub(crate) enum InteractionError {
     GenericError(),
 
     #[error("Cloudflare worker error: {0}")]
-    WorkerError(String)
+    WorkerError(String),
+
+    #[error("Failed to get env variable ")]
+    EnvVarError(#[from] std::env::VarError),
+
+    #[error("Message serialization failed")]
+    MessageSerializationError(#[from] twilight_validate::message::MessageValidationError),
+
+    #[error("Message (de)serialization failed")]
+    SerdeError(#[from] serde_json::Error),
+
+    #[error("HTTP error")]
+    HttpError(#[from] reqwest::Error),
 }
 
 impl From<worker::Error> for InteractionError {

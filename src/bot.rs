@@ -1,9 +1,10 @@
-use crate::interaction::{InteractionResponse, Interaction};
 use crate::http::HttpError;
 use crate::error::Error;
+use crate::interaction::Context;
 use crate::verification::verify_signature;
 use worker::{Request, RouteContext};
-
+use twilight_model::application::interaction::Interaction;
+use twilight_model::http::interaction::InteractionResponse;
 
 pub struct App {
     req: Request, 
@@ -47,8 +48,10 @@ impl App {
         
         let interaction =
         serde_json::from_str::<Interaction>(&body).map_err(Error::JsonFailed)?;
+        
         worker::console_log!{"Request parsed : {}", serde_json::to_string_pretty(&interaction).unwrap()};
-        let response = interaction.perform(&mut self.ctx).await?;
+        let handler  = Context {interaction};
+        let response = handler.perform(&mut self.ctx).await?;
         
         Ok(response)
 
