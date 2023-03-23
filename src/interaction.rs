@@ -1,4 +1,3 @@
-use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
 
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
@@ -145,9 +144,5 @@ impl Context {
                 .map_err(Error::InteractionFailed),
             _ => Err(Error::InvalidPayload("Not implemented".into())),
         }
-    }
-
-    pub(crate) fn new(interaction: Interaction) -> Self {
-        Self { interaction }
     }
 }

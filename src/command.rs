@@ -9,7 +9,7 @@ use twilight_model::{
     id::{
         marker::{CommandMarker, GenericMarker, GuildMarker, ChannelMarker, UserMarker},
         Id,
-    }, guild::PartialMember, user::User
+    }, guild::PartialMember
 };
 
 use crate::{commands, input::SharedInput};

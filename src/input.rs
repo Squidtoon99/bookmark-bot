@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use twilight_model::channel::{Message, message::{Component, component::{ActionRow, Button, ButtonStyle}, ReactionType}};
+use twilight_model::channel::{message::{Component, component::{ActionRow, Button, ButtonStyle}, ReactionType}};
 #[async_trait(?Send)]
 pub(crate) trait SharedInput<'a> {
     fn default_components<S: ToString>(&self, jump_url: S) -> Vec<twilight_model::channel::message::component::Component> {
@@ -22,7 +22,7 @@ pub(crate) trait SharedInput<'a> {
                                     name: "❌".to_string(),
                                 }),
                                 label: None,
-                                style: ButtonStyle::Primary,
+                                style: ButtonStyle::Secondary,
                                 url: None,
                             }),
                             Component::Button(Button {

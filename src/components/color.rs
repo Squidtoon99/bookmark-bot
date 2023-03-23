@@ -8,8 +8,9 @@ use twilight_model::channel::message::{
 };
 
 use async_trait::async_trait;
-use twilight_model::channel::message::{MessageFlags, ReactionType};
+use twilight_model::channel::message::{ReactionType};
 use twilight_model::http::interaction::{InteractionResponse, InteractionResponseType};
+use twilight_model::id::Id;
 use twilight_util::builder::InteractionResponseDataBuilder;
 use worker::console_log;
 
@@ -58,48 +59,72 @@ impl ComponentTrait for Color {
                 };
             let url = {
                 let u = url.as_ref().unwrap();
-                let (_, data) = u.split_at(27);
+                let (_, data) = u.split_at(29);
                 data.to_string()
             };
             let components = Component::ActionRow(ActionRow {
                 components: vec![
                     Component::Button(Button {
-                        style: ButtonStyle::Primary,
-                        label: Some("Blurple".into()),
+                        style: ButtonStyle::Secondary,
+                        label: None,
                         custom_id: Some(format!("color:5793266:{url}", url = url)),
-                        emoji: None,
+                        emoji: Some(ReactionType::Custom {
+                            id: Id::new(1086977694312439869),
+                            name: Some("bk_blurple".to_string()),
+                            animated: false
+                        }),
                         url: None,
                         disabled: false,
                     }),
                     Component::Button(Button {
                         style: ButtonStyle::Secondary,
-                        label: Some("Red".into()),
+                        label: None,
                         custom_id: Some(format!("color:15548997:{url}", url = url)),
-                        emoji: None,
-                        url: None,
-                        disabled: false,
-                    }),
-                    Component::Button(Button {
-                        style: ButtonStyle::Primary,
-                        label: Some("Green".into()),
-                        custom_id: Some(format!("color:5763719:{url}", url = url)),
-                        emoji: None,
+                        // <:bk_red:1086977702386466867>
+                        emoji: Some(ReactionType::Custom {
+                            id: Id::new(1086977702386466867),
+                            name: Some("bk_red".to_string()),
+                            animated: false
+                        }),
                         url: None,
                         disabled: false,
                     }),
                     Component::Button(Button {
                         style: ButtonStyle::Secondary,
-                        label: Some("Yellow".into()),
-                        custom_id: Some(format!("color:16705372:{url}", url = url)),
-                        emoji: None,
+                        label: None,
+                        custom_id: Some(format!("color:5763719:{url}", url = url)),
+                        // <:bk_green:1086977699488223384>
+                        emoji: Some(ReactionType::Custom {
+                            id: Id::new(1086977699488223384),
+                            name: Some("bk_green".to_string()),
+                            animated: false
+                        }),
                         url: None,
                         disabled: false,
                     }),
+                    // <:bk_yellow:1086977704194216066>
                     Component::Button(Button {
-                        style: ButtonStyle::Primary,
-                        label: Some("White".into()),
-                        custom_id: Some(format!("color:16777215:{url}", url = url)),
-                        emoji: None,
+                        style: ButtonStyle::Secondary,
+                        label: None,
+                        custom_id: Some(format!("color:16705372:{url}", url = url)),
+                        emoji: Some(ReactionType::Custom {
+                            id: Id::new(1086977704194216066),
+                            name: Some("bk_yellow".to_string()),
+                            animated: false
+                        }),
+                        url: None,
+                        disabled: false,
+                    }),
+                    // <:bk_fucahsia:1086977696216645657>
+                    Component::Button(Button {
+                        style: ButtonStyle::Secondary,
+                        label: None,
+                        custom_id: Some(format!("color:15418782:{url}", url = url)),
+                        emoji: Some(ReactionType::Custom {
+                            id: Id::new(1086977696216645657),
+                            name: Some("bk_fucahsia".to_string()),
+                            animated: false
+                        }),
                         url: None,
                         disabled: false,
                     }),

@@ -2,7 +2,7 @@ use crate::component::{Component, ComponentInput};
 use crate::error::InteractionError;
 
 use async_trait::async_trait;
-use reqwest::{ClientBuilder, StatusCode};
+use reqwest::{StatusCode};
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::http::interaction::{InteractionResponseType, InteractionResponse};
 use twilight_util::builder::InteractionResponseDataBuilder;
