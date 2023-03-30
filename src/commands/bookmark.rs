@@ -2,13 +2,14 @@ use crate::command::{Command, CommandInput};
 use crate::error::InteractionError;
 
 use async_trait::async_trait;
+use twilight_model::channel::message::sticker::{MessageSticker, StickerFormatType};
 
 use crate::input::SharedInput;
 use regex::Regex;
 use reqwest::StatusCode;
 use twilight_model::application::command::CommandType;
 use twilight_model::channel::message::component::{ActionRow, Button, ButtonStyle};
-use twilight_model::channel::message::{Component, Embed, MessageFlags, ReactionType};
+use twilight_model::channel::message::{Component, Embed, MessageFlags, ReactionType, Sticker};
 use twilight_model::guild::Guild;
 use twilight_model::http::interaction::InteractionResponseData;
 use twilight_model::id::marker::MessageMarker;
@@ -16,8 +17,8 @@ use twilight_model::id::Id;
 use twilight_util::builder::embed::{
     EmbedAuthorBuilder, EmbedBuilder, EmbedFooterBuilder, ImageSource,
 };
-use twilight_validate::embed::{embed as validate_embed};
 use twilight_util::builder::InteractionResponseDataBuilder;
+use twilight_validate::embed::embed as validate_embed;
 use worker::console_log;
 
 fn replace_links_with_markdown(text: &str) -> String {
@@ -25,14 +26,15 @@ fn replace_links_with_markdown(text: &str) -> String {
     let mut replaced_text = text.to_string();
 
     // Match and replace existing markdown links
-    for mdlink in mdlink_regex.find_iter(text) {
-        let url = &text[mdlink.start() + 1..mdlink.end() - 1];
-        let markdown_link = format!("[{}]({})", url, url);
-        replaced_text = replaced_text.replace(&text[mdlink.start()..mdlink.end()], &markdown_link);
-    }
+    // for mdlink in mdlink_regex.find_iter(text) {
 
-    // Match and replace non-markdown links
-    let link_regex = Regex::new(r#"(?P<url>https?://[^\s]+)"#).unwrap();
+    //     let url = &text[mdlink.start()..mdlink.end()];
+    //     let markdown_link = format!("[{}]({})", url, url);
+    //     replaced_text = replaced_text.replace(&text[mdlink.start()..mdlink.end()], &markdown_link);
+    // }
+
+    // Match and replace non-markdown links.
+    let link_regex = Regex::new(r#"(?:[^\(])(?P<url>https?://[^\s]+)"#).unwrap();
     replaced_text = link_regex
         .replace_all(&replaced_text, "[${url}](${url})")
         .to_string();
@@ -95,7 +97,7 @@ impl Command for Bookmark {
                         .unwrap()
                         .messages
                         .get(&og_msg_id)
-                        .unwrap();
+                        .expect("Message not found in resolved");
                     let t_url = format!(
                         "https://discord.com/channels/{}/{}/{}",
                         input.guild_id.unwrap(),
@@ -120,7 +122,7 @@ impl Command for Bookmark {
                         .text()
                         .await?;
                     let guild: Guild = serde_json::from_str(&guild_text)?;
-                    let mut author = EmbedAuthorBuilder::new(msg_data.author.name.clone());
+                    let mut author = EmbedAuthorBuilder::new(format!("{} ({})", msg_data.author.name, msg_data.author.id.get()));
 
                     if let Some(icon) = msg_data.author.avatar {
                         author = author.icon_url(
@@ -161,6 +163,7 @@ impl Command for Bookmark {
                     }
 
                     if msg_data.content.len() > 0 {
+                        
                         embeds.insert(
                             0,
                             EmbedBuilder::new()
@@ -169,10 +172,16 @@ impl Command for Bookmark {
                         );
                     };
 
-                    for embed in embeds.iter_mut() {
-                        embed.description = Some(replace_links_with_markdown(
-                            &embed.description.clone().unwrap(),
-                        ));
+                    let can_add = |embed: &Embed, desc: &String| {
+                        let mut temp = embed.clone();
+                        temp.description = Some(temp.description.unwrap_or_default() + &desc);
+                        validate_embed(&temp).is_ok()
+                    };
+                    
+                    for mut embed in embeds.iter_mut() {
+                        embed.description = embed.description.as_ref().map(|s| {
+                            replace_links_with_markdown(&s)
+                        });
                     }
                     // Attachments text
                     let attachments = msg_data.attachments.clone();
@@ -186,28 +195,59 @@ impl Command for Bookmark {
                             .map(|a| format!("[{}]({})", a.filename, a.url))
                             .collect::<Vec<String>>()
                             .join("\n> ");
-                        
-                        let attachment_desc = format!(
-                                "\n**Attachments:**\n> {}",
-                                fmt
-                            );
 
-                        let can_add = |embed: &Embed, desc: &String| {
-                            let mut temp = embed.clone();
-                            temp.description = Some(temp.description.unwrap_or_default() + &desc);
-                            validate_embed(&temp).is_ok()
-                        };
+                        let attachment_desc = format!("\n**Attachments:**\n> {}", fmt);
 
                         if can_add(&embeds[0], &attachment_desc) {
-                            embeds[0].description = Some(format!("{}{}", embeds[0].description.clone().unwrap_or_default(), attachment_desc));
+                            embeds[0].description = Some(format!(
+                                "{}{}",
+                                embeds[0].description.clone().unwrap_or_default(),
+                                attachment_desc
+                            ));
                         } else if can_add(&embeds[embeds.len() - 1], &attachment_desc) {
                             let last = embeds.len() - 1;
-                            embeds[last].description = Some(format!("{}{}", embeds[last].description.clone().unwrap_or_default(), attachment_desc));
+                            embeds[last].description = Some(format!(
+                                "{}{}",
+                                embeds[last].description.clone().unwrap_or_default(),
+                                attachment_desc
+                            ));
                         } else {
                             embeds.push(EmbedBuilder::new().description(attachment_desc).build());
                         }
                     }
-
+                    // Stickers text
+                    let stickers = msg_data.sticker_items.clone();
+                    let make_sticker_url = |s: &MessageSticker| {
+                        let typ = match s.format_type {
+                            StickerFormatType::Png => "png",
+                            StickerFormatType::Apng => "png",
+                            StickerFormatType::Lottie => "json",
+                            StickerFormatType::Gif => "gif",
+                            _ => "png",
+                        };
+                        format!(
+                            "https://media.discordapp.net/stickers/{}.{}",
+                            s.id.get(),
+                            typ
+                        )
+                    };
+                    if stickers.len() == 1 && stickers[0].format_type != StickerFormatType::Lottie {
+                        embeds.push(
+                            EmbedBuilder::new()
+                                .image(ImageSource::url(make_sticker_url(&stickers[0])).unwrap())
+                                .build(),
+                        );
+                    } else if stickers.len() > 1 {
+                        let mut desc = String::new();
+                        for sticker in stickers {
+                            desc.push_str(&format!(
+                                "[{}]({})\n",
+                                sticker.name,
+                                make_sticker_url(&sticker)
+                            ));
+                        }
+                        embeds.push(EmbedBuilder::new().description(desc).build());
+                    }
                     // Overiding the footer(server) and author data
                     embeds[0].author = Some(author.build());
                     embeds[0].footer = Some(footer.build());

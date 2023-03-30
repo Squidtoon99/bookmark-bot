@@ -60,7 +60,6 @@ impl Command for Help {
               ]
             }))?;
         
-        
         let components = Component::ActionRow(ActionRow {
             components: vec![
                 // invite bot button
@@ -69,7 +68,7 @@ impl Command for Help {
                     label: Some("Invite".into()),
                     emoji: None,
                     custom_id: None,
-                    url: Some(format!("https://discord.com/api/oauth2/authorize?client_id={}&permissions=0&scope=bot%20applications.commands", std::env::var("DISCORD_APPLICATION_ID").expect("DISCORD_APPLICATION_ID not set"))),
+                    url: Some(format!("https://discord.com/api/oauth2/authorize?client_id={}&permissions=0&scope=bot%20applications.commands", &input.ctx.var("DISCORD_APPLICATION_ID").expect("DISCORD_APPLICATION_ID not set").to_string())),
                     disabled: false,
                 }),
                 // support form button
