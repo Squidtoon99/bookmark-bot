@@ -32,7 +32,7 @@ impl Command for Help {
                 }
               ],
               "image": {
-                "url": "https://i.imgur.com/g5nLSDR.png"
+                "url": "https://i.imgur.com/xhlrXm6.png"
               }
             }))?;
         
