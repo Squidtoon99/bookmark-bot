@@ -43,7 +43,7 @@ impl Command for Help {
               "color": 3092790,
               "fields": [
                 {
-                  "name": ":pencil: Add Note",
+                  "name": ":pencil: Add Note (coming soon)",
                   "value": "Adds a note to the bookmark. Leave blank to remove the note",
                   "inline": true
                 },
